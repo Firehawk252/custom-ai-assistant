@@ -1,4 +1,4 @@
-# custom-ai-assistant
+# Custom AI Assistant
 A general purpose AI assistant that can answer questions on virtually any topic and adapt its communication style based on user preferences.
 
 The user should be able to customize how the AI communicates without having to modify the Python source code.
