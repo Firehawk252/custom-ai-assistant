@@ -1,0 +1,4 @@
+{
+    "_description": "Stores information the assistant should remember across conversations.",
+    "memories": []
+}
