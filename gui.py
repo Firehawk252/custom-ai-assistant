@@ -1,4 +1,4 @@
-# Custom AI Assistant - GUI
+# Custom AI Assistant - GUI - v.1.5
 # Create a separate graphical interface that opens in its own desktop window
 # Notes:
 #   'window' creates the main application window
