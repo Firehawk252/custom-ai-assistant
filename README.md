@@ -87,3 +87,6 @@ The application uses a locally running AI model through Ollama. Users can custom
   - Build a desktop application with a chat window and customization panel
 - Stage 8 - Advanced Features
   - Explore document analysis and additional AI capabilities
+
+### Disclaimer
+AI tools were used during development to assist with code review, troubleshooting, debugging, and functionality improvements. All implementation decisions, testing, and project development were reviewed and directed by the developer.
