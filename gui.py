@@ -20,6 +20,8 @@ import tkinter.font as tkfont
 import threading
 import queue
 import sys
+import os
+from tkinter import simpledialog, messagebox
 
 
 def main():
@@ -2092,6 +2094,381 @@ def main():
     # ------------------------------------------------------------------
     # Chat logic
     # ------------------------------------------------------------------
+
+    def get_saved_conversations():
+        saved_files = []
+
+        for filename in os.listdir():
+            if filename.endswith(".json") and filename != "memory.json":
+                saved_files.append(filename)
+
+        return saved_files
+
+    def display_command_result(text):
+        add_message("Assistant", text)
+
+    def handle_command(message):
+        nonlocal messages, memories
+
+        command, _, argument = message.partition(" ")
+        command = command.lower()
+        argument = argument.strip()
+
+        if command == "help":
+            display_command_result(
+                "Available Commands:\n\n"
+                "help - Display available commands\n"
+                "exit - Close the application\n"
+                "settings - Open settings\n"
+                "show - Display current settings\n"
+                "remember - Save a memory\n"
+                "forget - Delete a saved memory\n"
+                "memories - Display saved memories\n"
+                "clear / new - Start a fresh conversation\n"
+                "save - Save the current conversation\n"
+                "load - Load a saved conversation\n"
+                "list - List saved conversations\n"
+                "delete - Delete a saved conversation\n"
+                "rename - Rename a saved conversation"
+            )
+            return True
+
+        elif command == "exit":
+            window.destroy()
+            return True
+
+        elif command == "settings":
+            if not S["sidebar_open"]:
+                toggle_settings()
+
+            display_command_result("Settings opened.")
+            return True
+
+        elif command == "show":
+            display_command_result(
+                "Current Assistant Settings:\n\n"
+                f"Personality: {settings['personality']}\n"
+                f"Tone: {settings['tone']}\n"
+                f"Response Length: {settings['response_length']}\n"
+                f"Language: {settings['language']}\n"
+                f"Technical Level: {settings['technical_level']}\n"
+                f"Creativity: {settings['creativity']}\n"
+                f"Custom Instructions: {settings['custom_instructions'] or 'None'}"
+            )
+            return True
+
+        elif command == "remember":
+            memory = argument
+
+            if not memory:
+                memory = simpledialog.askstring(
+                    "Remember",
+                    "What would you like me to remember?",
+                    parent=window
+                )
+
+            if memory:
+                memories.append(memory)
+                assistant.save_memory(memories)
+                update_messages()
+                display_command_result("Memory saved!")
+            else:
+                display_command_result("No memory was added.")
+
+            return True
+
+        elif command == "memories":
+            if not memories:
+                display_command_result("No memories saved.")
+            else:
+                memory_list = "\n".join(
+                    f"{index}. {memory}"
+                    for index, memory in enumerate(memories, start=1)
+                )
+
+                display_command_result(
+                    "Saved Memories:\n\n" + memory_list
+                )
+
+            return True
+
+        elif command == "forget":
+            if not memories:
+                display_command_result("No memories to delete.")
+                return True
+
+            memory_list = "\n".join(
+                f"{index}. {memory}"
+                for index, memory in enumerate(memories, start=1)
+            )
+
+            choice = simpledialog.askinteger(
+                "Forget Memory",
+                "Select a memory to delete:\n\n" + memory_list,
+                parent=window,
+                minvalue=1,
+                maxvalue=len(memories)
+            )
+
+            if choice is not None:
+                deleted_memory = memories.pop(choice - 1)
+                assistant.save_memory(memories)
+                update_messages()
+
+                display_command_result(
+                    f"Memory deleted:\n{deleted_memory}"
+                )
+
+            return True
+
+        elif command in ("clear", "new"):
+            messages = assistant.create_messages(
+                settings["personality"],
+                settings["tone"],
+                settings["response_length"],
+                settings["language"],
+                settings["technical_level"],
+                settings["creativity"],
+                settings["custom_instructions"],
+                memories
+            )
+
+            conversation.clear()
+            S["scroll"] = 0
+            S["layout_key"] = None
+
+            display_command_result(
+                "Conversation history cleared. Starting a new conversation!"
+            )
+
+            return True
+
+        elif command == "save":
+            filename = argument
+
+            if not filename:
+                filename = simpledialog.askstring(
+                    "Save Conversation",
+                    "Enter a filename:",
+                    parent=window
+                )
+
+            if filename:
+                if os.path.exists(filename + ".json"):
+                    display_command_result(
+                        "A conversation with that filename already exists."
+                    )
+                else:
+                    assistant.save_conversation(
+                        messages,
+                        settings,
+                        filename
+                    )
+
+                    display_command_result("Conversation saved!")
+            else:
+                display_command_result("Save cancelled.")
+
+            return True
+
+        elif command == "list":
+            saved_files = get_saved_conversations()
+
+            if not saved_files:
+                display_command_result(
+                    "No saved conversations found."
+                )
+            else:
+                display_command_result(
+                    "Saved Conversations:\n\n" +
+                    "\n".join(
+                        f"{index}. {filename[:-5]}"
+                        for index, filename in enumerate(saved_files, start=1)
+                    )
+                )
+
+            return True
+
+        elif command == "load":
+            saved_files = get_saved_conversations()
+
+            if not saved_files:
+                display_command_result(
+                    "No saved conversations found."
+                )
+                return True
+
+            file_list = "\n".join(
+                f"{index}. {filename[:-5]}"
+                for index, filename in enumerate(saved_files, start=1)
+            )
+
+            choice = simpledialog.askinteger(
+                "Load Conversation",
+                "Select a conversation:\n\n" + file_list,
+                parent=window,
+                minvalue=1,
+                maxvalue=len(saved_files)
+            )
+
+            if choice is not None:
+                filename = saved_files[choice - 1]
+
+                loaded = assistant.load_conversation(
+                    filename[:-5]
+                )
+
+                if loaded is not None:
+                    messages = loaded["messages"]
+                    settings.update(loaded["settings"])
+
+                    memories = assistant.load_memory()
+
+                    update_messages()
+
+                    setting_names = [
+                        "personality",
+                        "tone",
+                        "response_length",
+                        "language",
+                        "technical_level",
+                        "creativity"
+                    ]
+
+                    for menu, setting in zip(
+                        setting_menus,
+                        setting_names
+                    ):
+                        menu.set(settings[setting])
+
+                    custom_instructions_box.delete("1.0", "end")
+                    custom_instructions_box.insert(
+                        "1.0",
+                        settings["custom_instructions"]
+                    )
+
+                    conversation.clear()
+
+                    for item in messages[1:]:
+                        sender = (
+                            "You"
+                            if item["role"] == "user"
+                            else "Assistant"
+                        )
+
+                        conversation.append(
+                            (sender, item["content"])
+                        )
+
+                    S["scroll"] = 0
+                    S["layout_key"] = None
+
+                    render_all()
+                    render_messages(scroll_to_bottom=True)
+
+                    display_command_result(
+                        "Conversation loaded!"
+                    )
+
+            return True
+
+        elif command == "delete":
+            saved_files = get_saved_conversations()
+
+            if not saved_files:
+                display_command_result(
+                    "No saved conversations found."
+                )
+                return True
+
+            file_list = "\n".join(
+                f"{index}. {filename[:-5]}"
+                for index, filename in enumerate(saved_files, start=1)
+            )
+
+            choice = simpledialog.askinteger(
+                "Delete Conversation",
+                "Select a conversation to delete:\n\n" + file_list,
+                parent=window,
+                minvalue=1,
+                maxvalue=len(saved_files)
+            )
+
+            if choice is not None:
+                filename = saved_files[choice - 1]
+
+                confirm = messagebox.askyesno(
+                    "Delete Conversation",
+                    f"Are you sure you want to delete {filename[:-5]}?",
+                    parent=window
+                )
+
+                if confirm:
+                    assistant.delete_conversation(
+                        filename[:-5]
+                    )
+
+                    display_command_result(
+                        "Conversation deleted!"
+                    )
+
+                else:
+                    display_command_result(
+                        "Deletion cancelled."
+                    )
+
+            return True
+
+        elif command == "rename":
+            saved_files = get_saved_conversations()
+
+            if not saved_files:
+                display_command_result(
+                    "No saved conversations found."
+                )
+                return True
+
+            file_list = "\n".join(
+                f"{index}. {filename[:-5]}"
+                for index, filename in enumerate(saved_files, start=1)
+            )
+
+            choice = simpledialog.askinteger(
+                "Rename Conversation",
+                "Select a conversation to rename:\n\n" + file_list,
+                parent=window,
+                minvalue=1,
+                maxvalue=len(saved_files)
+            )
+
+            if choice is not None:
+                old_filename = saved_files[choice - 1][:-5]
+
+                new_filename = simpledialog.askstring(
+                    "Rename Conversation",
+                    "Enter a new filename:",
+                    parent=window
+                )
+
+                if new_filename:
+                    if os.path.exists(new_filename + ".json"):
+                        display_command_result(
+                            "A conversation with that filename already exists."
+                        )
+                    else:
+                        assistant.rename_conversation(
+                            old_filename,
+                            new_filename
+                        )
+
+                        display_command_result(
+                            "Conversation renamed!"
+                        )
+
+            return True
+
+        return False
+
     def add_message(sender, content):
         conversation.append(
             (sender, content)
@@ -2141,18 +2518,22 @@ def main():
                 check_response
             )
 
+
     def send_message():
         nonlocal thinking_visible
 
         message = user_input.get()
 
         if message:
+            user_input.delete(0, "end")
+
+            if handle_command(message):
+                return
+
             add_message(
                 "You",
                 message
             )
-
-            user_input.delete(0, "end")
 
             messages.append({
                 "role": "user",
