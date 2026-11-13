@@ -23,9 +23,37 @@ def ask_ai(messages):
         answer = response["message"]["content"]
         messages.append({"role": "assistant", "content": answer})
         print(answer)
+        return answer
     except Exception as error:
             print(error)
             print("AI service is unavailable. Please try again later.")
+
+# This function gives the ability to let the assistant display the response as it's being generated
+def ask_ai_stream(messages):
+    full_response = ""
+
+    try:
+        # Request a streamed response from the local Ollama model
+        stream = ollama.chat(
+            model = "llama3.2",
+            messages = messages,
+            stream = True
+        )
+
+        # Process each piece of the response as it arrives
+        for chunk in stream:
+            token = chunk["message"]["content"]
+            full_response += token
+
+            # Send each piece back to the GUI
+            yield token
+
+        # Save the completed response to the conversation history
+        messages.append({"role": "assistant", "content": full_response})
+
+    except Exception as error:
+        print(error)
+        yield "\nAI service is unavailable. Please try again later."
 
 # This function handles message creation based on user input for personality, tone, language, technical level
 def create_messages(personality, tone, response_length, language, technical_level, creativity, custom_instructions, memories):
